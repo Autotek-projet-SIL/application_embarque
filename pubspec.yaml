@@ -30,6 +30,7 @@ dependencies:
   cupertino_icons: ^1.0.0
   flutter_bluetooth_serial: ^0.2.2
   control_button: ^0.0.2
+  compasstools: ^0.1.0
 
 dev_dependencies:
   flutter_test:

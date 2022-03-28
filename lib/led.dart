@@ -4,8 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:control_button/control_button.dart';
-
+import 'dart:developer';
 
 class ChatPage extends StatefulWidget {
   final BluetoothDevice server;
@@ -124,49 +123,29 @@ class _ChatPage extends State<ChatPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(height: 100,),
-            ControlButton(
-              sectionOffset: FixedAngles.Zero,
-              externalDiameter: 300,
-              internalDiameter: 120,
-              dividerColor: Colors.greenAccent,
-              elevation: 2,
-              externalColor: Colors.green[500],
-              internalColor: Colors.grey[300],
-              mainAction: () {
-                _sendMessage('3');
-              },
-              sections: [
-                    () => _sendMessage('2'),
-                    () => _sendMessage('1'),
-                    () => _sendMessage('4'),
-                    () => _sendMessage('6'),
-                    () => _sendMessage('5'),
-                    () => _sendMessage('7'),
-              ],
-            ),
-            Flexible(
-              child: ListView(
-                  padding: const EdgeInsets.all(12.0),
-                  controller: listScrollController,
-                  children: list),
-            ),
             Row(
               children: <Widget>[
                 Flexible(
                   child: Container(
+                    height: 200,
+                    color: Colors.white,
+
                     margin: const EdgeInsets.only(left: 16.0),
                     child: TextField(
-                      style: const TextStyle(fontSize: 15.0),
+
+                      keyboardType: TextInputType.multiline,
+                      maxLines: null,
+                      style: const TextStyle(fontSize: 15.0 , color: Colors.black),
                       controller: textEditingController,
                       decoration: InputDecoration.collapsed(
                         hintText: isConnecting
                             ? 'Wait until connected...'
                             : isConnected
-                                ? 'Type your message...'
-                                : 'Chat got disconnected',
+                            ? 'Type your message...'
+                            : 'Chat got disconnected',
                         hintStyle: const TextStyle(color: Colors.grey),
                       ),
-                      enabled: isConnected,
+                      enabled: true, // is connected
                     ),
                   ),
                 ),
@@ -174,12 +153,19 @@ class _ChatPage extends State<ChatPage> {
                   margin: const EdgeInsets.all(8.0),
                   child: IconButton(
                       icon: const Icon(Icons.send),
-                      onPressed: isConnected
-                          ? () => _sendMessage(textEditingController.text)
+                      onPressed: true // is connected
+                          ? () => _sendMultipleMessages(textEditingController.text)
                           : null),
                 ),
               ],
+            ),
+            Flexible(
+              child: ListView(
+                  padding: const EdgeInsets.all(12.0),
+                  controller: listScrollController,
+                  children: list),
             )
+
           ],
         ),
       ),
@@ -234,6 +220,95 @@ class _ChatPage extends State<ChatPage> {
           : _messageBuffer + dataString);
     }
   }
+
+    _sendMultipleMessages (String text) async{
+
+
+    var lines = text.split(new RegExp("\\r?\\n")).where((i) => i != "").toList();
+    var splitArray = lines.map((e) => e.trim().split(" ")).toList();
+    var arrayOfCommands = splitArray.map((e) => e.first).toList();
+    var arrayOfDuration = splitArray.map((e) => e.length > 1 ? int.parse(e[1]) : 30).toList();
+
+
+    log('data:'+ arrayOfCommands.toString() );
+    log('data:'+ arrayOfDuration.toString() );
+
+    var arrayOfCommandsCompiled = _analyseLexicale(arrayOfCommands);
+    var syntax_res = _analyseSyntaxique(arrayOfCommandsCompiled);
+    if(arrayOfCommandsCompiled[0].length > 1){
+      log('data:'+ arrayOfCommandsCompiled[0] );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(arrayOfCommandsCompiled[0].length),
+      ));
+    }else {
+      if (syntax_res == 'correcte') {
+        for (var i = 0 ; i < arrayOfCommandsCompiled.length ; i++) {
+
+          log('data:' + arrayOfCommandsCompiled[i] + ' '+arrayOfDuration[i].toString());
+          _sendMessage(arrayOfCommandsCompiled[i]);
+          await Future.delayed(Duration(milliseconds: arrayOfDuration[i]));
+
+        }
+      } else {
+        log('data: $syntax_res');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(syntax_res),
+        ));
+      }
+    }
+  }
+
+
+  String _analyseSyntaxique(List<dynamic> arrayOfCommandsCompiled){
+    var non_arrete_etats = ['B','F','L','R'];
+    var arrete = 0;
+    var non_arrete = 1;
+    var etat= arrete;
+    for(var i = 0 ; i < arrayOfCommandsCompiled.length ; i++){
+      if(etat == arrete){
+        if(non_arrete_etats.indexOf(arrayOfCommandsCompiled[i]) >= 0 ) {
+          etat = non_arrete;
+          continue;
+        }else{
+          return 'Vous ne pouvez pas vous arretez en etant deja arrete , erreur a la ligne ${i+1}';
+        }
+      }
+      else if(etat == non_arrete){
+        if(arrayOfCommandsCompiled[i] == 'S'){
+          etat = arrete;
+          continue;
+        }
+        else{
+          return 'Vous avez oublié de marquer un arret apres le $arrayOfCommandsCompiled[i] a la ligne ${i+1}';
+        }
+      }
+    }
+    if(etat == arrete){return 'correcte';}else{return 'Erreur , vous devez finir par un arret';}
+  }
+
+  List<dynamic> _analyseLexicale(List<String> arrayOfCommands){
+    var res = [];
+    for(var i = 0 ; i < arrayOfCommands.length ;i++){
+      switch (arrayOfCommands.elementAt(i)) {
+        case 'STOP' : res.add('S');
+        break;
+        case 'FORWARD' : res.add('F');
+        break;
+        case 'BACKWARD' : res.add('B');
+        break;
+        case 'LEFT' : res.add('L');
+        break;
+        case 'RIGHT': res.add('R');
+        break;
+        default:
+          var str = 'Erreur a la ligne ${i+1} , "' +arrayOfCommands.elementAt(i) +'" n''appartient pas au langauage' ;
+          return [str];
+      }
+    }
+    return res;
+  }
+
+
 
   void _sendMessage(String text) async {
     text = text.trim();
