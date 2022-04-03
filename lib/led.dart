@@ -30,7 +30,7 @@ class _ChatPage extends State<ChatPage> {
   String _messageBuffer = '';
 
   final TextEditingController textEditingController =
-      new TextEditingController();
+  new TextEditingController();
   final ScrollController listScrollController = new ScrollController();
 
   bool isConnecting = true;
@@ -92,7 +92,7 @@ class _ChatPage extends State<ChatPage> {
         children: <Widget>[
           Container(
             child: Text(
-                (text) {
+                    (text) {
                   return text == '/shrug' ? '¯\\_(ツ)_/¯' : text;
                 }(_message.text.trim()),
                 style: TextStyle(color: Colors.white)),
@@ -101,7 +101,7 @@ class _ChatPage extends State<ChatPage> {
             width: 222.0,
             decoration: BoxDecoration(
                 color:
-                    _message.whom == clientID ? Colors.greenAccent : Colors.grey,
+                _message.whom == clientID ? Colors.greenAccent : Colors.grey,
                 borderRadius: BorderRadius.circular(7.0)),
           ),
         ],
@@ -116,8 +116,8 @@ class _ChatPage extends State<ChatPage> {
           title: (isConnecting
               ? Text('Connecting chat to ' + widget.server.name + '...')
               : isConnected
-                  ? Text('Live chat with ' + widget.server.name)
-                  : Text('Chat log with ' + widget.server.name))),
+              ? Text('Live chat with ' + widget.server.name)
+              : Text('Chat log with ' + widget.server.name))),
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -207,7 +207,7 @@ class _ChatPage extends State<ChatPage> {
             1,
             backspacesCounter > 0
                 ? _messageBuffer.substring(
-                    0, _messageBuffer.length - backspacesCounter)
+                0, _messageBuffer.length - backspacesCounter)
                 : _messageBuffer + dataString.substring(0, index),
           ),
         );
@@ -216,75 +216,82 @@ class _ChatPage extends State<ChatPage> {
     } else {
       _messageBuffer = (backspacesCounter > 0
           ? _messageBuffer.substring(
-              0, _messageBuffer.length - backspacesCounter)
+          0, _messageBuffer.length - backspacesCounter)
           : _messageBuffer + dataString);
     }
   }
 
-    _sendMultipleMessages (String text) async{
+  _sendMultipleMessages (String text) async{
 
-
+    var speed = 200;
     var lines = text.split(new RegExp("\\r?\\n")).where((i) => i != "").toList();
     var splitArray = lines.map((e) => e.trim().split(" ")).toList();
     var arrayOfCommands = splitArray.map((e) => e.first).toList();
-    var arrayOfDuration = splitArray.map((e) => e.length > 1 ? int.parse(e[1]) : 30).toList();
+    var arrayOfarguments = splitArray.map((e) => e.length > 1 ? double.parse(e[1]) : 50).toList();
+    var arrayOfDuration = _conversionToSeconds(arrayOfCommands, arrayOfarguments,speed);
+
 
 
     log('data:'+ arrayOfCommands.toString() );
+    log('data:'+ arrayOfarguments.toString() );
     log('data:'+ arrayOfDuration.toString() );
 
     var arrayOfCommandsCompiled = _analyseLexicale(arrayOfCommands);
-    var syntax_res = _analyseSyntaxique(arrayOfCommandsCompiled);
+
+
+    log('data:'+ arrayOfCommandsCompiled.toString() );
+
+
     if(arrayOfCommandsCompiled[0].length > 1){
       log('data:'+ arrayOfCommandsCompiled[0] );
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(arrayOfCommandsCompiled[0].length),
       ));
     }else {
-      if (syntax_res == 'correcte') {
+
         for (var i = 0 ; i < arrayOfCommandsCompiled.length ; i++) {
 
-          log('data:' + arrayOfCommandsCompiled[i] + ' '+arrayOfDuration[i].toString());
+          log('data:' + arrayOfCommandsCompiled[i] + ' duration:'+arrayOfDuration[i].toString() + ' arg:'+arrayOfarguments[i].toString());
           _sendMessage(arrayOfCommandsCompiled[i]);
-          await Future.delayed(Duration(milliseconds: arrayOfDuration[i]));
+
+            await Future.delayed(Duration(milliseconds: arrayOfDuration[i]));
 
         }
-      } else {
-        log('data: $syntax_res');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(syntax_res),
-        ));
+      }
+
+  }
+
+  List<dynamic> _conversionToSeconds(List<dynamic> arrayOfCommands , List<dynamic> arrayOfarguments , int speed){
+    var arrayOfDuration = [];
+    for(var i = 0 ; i < arrayOfCommands.length ; i++ ){
+      switch (arrayOfCommands.elementAt(i)) {
+        case 'STOP' : arrayOfDuration.add(arrayOfarguments[i]);
+        break;
+        case 'FORWARD' : arrayOfDuration.add(    ((-12.5*speed + 6000)*arrayOfarguments[i]).toInt()   );
+        break;
+        case 'BACKWARD' : arrayOfDuration.add(((-12.5*speed + 6000)*arrayOfarguments[i]).toInt());
+        break;
+        case 'LEFT' : arrayOfDuration.add((arrayOfarguments[i]*1000/90 ).toInt());
+        break;
+        case 'RIGHT': arrayOfDuration.add((arrayOfarguments[i]*1000/90 ).toInt());
+        break;
+        case 'ACCELERER': arrayOfDuration.add(50); speed = 240;
+        break;
+        case 'DECELERER': arrayOfDuration.add(50); speed = 200;
+        break;
+        case 'NORMALSPEED': arrayOfDuration.add(50); speed = 200;
+        break;
+        case 'RONDPOINT': arrayOfDuration.add(  (arrayOfarguments[i]*3500).toInt() );
+        break;
+        default:
+          var str = 'Erreur a la ligne ${i+1} , "' +arrayOfCommands.elementAt(i) +'" n''appartient pas au langauage' ;
+          return [str];
       }
     }
+    return arrayOfDuration;
   }
 
 
-  String _analyseSyntaxique(List<dynamic> arrayOfCommandsCompiled){
-    var non_arrete_etats = ['B','F','L','R'];
-    var arrete = 0;
-    var non_arrete = 1;
-    var etat= arrete;
-    for(var i = 0 ; i < arrayOfCommandsCompiled.length ; i++){
-      if(etat == arrete){
-        if(non_arrete_etats.indexOf(arrayOfCommandsCompiled[i]) >= 0 ) {
-          etat = non_arrete;
-          continue;
-        }else{
-          return 'Vous ne pouvez pas vous arretez en etant deja arrete , erreur a la ligne ${i+1}';
-        }
-      }
-      else if(etat == non_arrete){
-        if(arrayOfCommandsCompiled[i] == 'S'){
-          etat = arrete;
-          continue;
-        }
-        else{
-          return 'Vous avez oublié de marquer un arret apres le $arrayOfCommandsCompiled[i] a la ligne ${i+1}';
-        }
-      }
-    }
-    if(etat == arrete){return 'correcte';}else{return 'Erreur , vous devez finir par un arret';}
-  }
 
   List<dynamic> _analyseLexicale(List<String> arrayOfCommands){
     var res = [];
@@ -299,6 +306,14 @@ class _ChatPage extends State<ChatPage> {
         case 'LEFT' : res.add('L');
         break;
         case 'RIGHT': res.add('R');
+        break;
+        case 'ACCELERER': res.add('A');
+        break;
+        case 'DECELERER': res.add('D');
+        break;
+        case 'NORMALSPEED': res.add('N');
+        break;
+        case 'RONDPOINT': res.add('P');
         break;
         default:
           var str = 'Erreur a la ligne ${i+1} , "' +arrayOfCommands.elementAt(i) +'" n''appartient pas au langauage' ;
