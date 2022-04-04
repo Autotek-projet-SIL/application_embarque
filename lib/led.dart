@@ -7,7 +7,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'dart:developer';
 
 class ChatPage extends StatefulWidget {
-  final BluetoothDevice server;
+  final BluetoothDevice? server;
 
   const ChatPage({this.server});
 
@@ -24,9 +24,9 @@ class _Message {
 
 class _ChatPage extends State<ChatPage> {
   static final clientID = 0;
-  BluetoothConnection connection;
+  BluetoothConnection? connection;
 
-  List<_Message> messages = List<_Message>();
+  List<_Message> messages = <_Message>[];
   String _messageBuffer = '';
 
   final TextEditingController textEditingController =
@@ -34,7 +34,7 @@ class _ChatPage extends State<ChatPage> {
   final ScrollController listScrollController = new ScrollController();
 
   bool isConnecting = true;
-  bool get isConnected => connection != null && connection.isConnected;
+  bool get isConnected => connection != null && connection!.isConnected;
 
   bool isDisconnecting = false;
 
@@ -42,7 +42,7 @@ class _ChatPage extends State<ChatPage> {
   void initState() {
     super.initState();
 
-    BluetoothConnection.toAddress(widget.server.address).then((_connection) {
+    BluetoothConnection.toAddress(widget.server!.address).then((_connection) {
       print('Connected to the device');
       connection = _connection;
       setState(() {
@@ -50,7 +50,7 @@ class _ChatPage extends State<ChatPage> {
         isDisconnecting = false;
       });
 
-      connection.input.listen(_onDataReceived).onDone(() {
+      connection!.input!.listen(_onDataReceived).onDone(() {
         // Example: Detect which side closed the connection
         // There should be `isDisconnecting` flag to show are we are (locally)
         // in middle of disconnecting process, should be set before calling
@@ -77,7 +77,7 @@ class _ChatPage extends State<ChatPage> {
     // Avoid memory leak (`setState` after dispose) and disconnect
     if (isConnected) {
       isDisconnecting = true;
-      connection.dispose();
+      connection!.dispose();
       connection = null;
     }
 
@@ -114,10 +114,10 @@ class _ChatPage extends State<ChatPage> {
     return Scaffold(
       appBar: AppBar(
           title: (isConnecting
-              ? Text('Connecting chat to ' + widget.server.name + '...')
+              ? Text('Connecting chat to ' + widget.server!.name! + '...')
               : isConnected
-              ? Text('Live chat with ' + widget.server.name)
-              : Text('Chat log with ' + widget.server.name))),
+              ? Text('Live chat with ' + widget.server!.name!)
+              : Text('Chat log with ' + widget.server!.name!))),
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -331,8 +331,8 @@ class _ChatPage extends State<ChatPage> {
 
     if (text.length > 0) {
       try {
-        connection.output.add(utf8.encode(text + "\r\n"));
-        await connection.output.allSent;
+        connection!.output.add(utf8.encode(text + "\r\n") as Uint8List);
+        await connection!.output.allSent;
 
         setState(() {
           messages.add(_Message(clientID, text));

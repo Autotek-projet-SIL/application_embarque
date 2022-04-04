@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "331835875863",
+    "project_id": "autotek-8c725",
+    "storage_bucket": "autotek-8c725.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331835875863:android:c6709c9505c447220c7252",
+        "android_client_info": {
+          "package_name": "autotek.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331835875863-istaf5js2sj0brl4vt04er0ht1jo53ds.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWfcw2g8qbhqLApCHc_zFkmzZ6fgbSv0U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331835875863-istaf5js2sj0brl4vt04er0ht1jo53ds.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331835875863:android:c16c50afd1c952ef0c7252",
+        "android_client_info": {
+          "package_name": "com.example.AutotekCar"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331835875863-istaf5js2sj0brl4vt04er0ht1jo53ds.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWfcw2g8qbhqLApCHc_zFkmzZ6fgbSv0U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331835875863-istaf5js2sj0brl4vt04er0ht1jo53ds.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

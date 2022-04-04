@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:servo_app/device.dart';
+import 'package:AutotekCar/device.dart';
 
 class SelectBondedDevicePage extends StatefulWidget {
   /// If true, on page start there is performed discovery upon the bonded devices.
@@ -10,7 +10,7 @@ class SelectBondedDevicePage extends StatefulWidget {
   final Function onCahtPage;
 
   const SelectBondedDevicePage(
-      {this.checkAvailability = true, @required this.onCahtPage});
+      {this.checkAvailability = true, required this.onCahtPage});
 
   @override
   _SelectBondedDevicePage createState() => new _SelectBondedDevicePage();
@@ -25,17 +25,18 @@ enum _DeviceAvailability {
 class _DeviceWithAvailability extends BluetoothDevice {
   BluetoothDevice device;
   _DeviceAvailability availability;
-  int rssi;
+  int? rssi;
 
-  _DeviceWithAvailability(this.device, this.availability, [this.rssi]);
+  _DeviceWithAvailability(this.device, this.availability, [this.rssi]) :
+        super(name: device.name, address: device.address)  ;
 }
 
 class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
-  List<_DeviceWithAvailability> devices = List<_DeviceWithAvailability>();
+  List<_DeviceWithAvailability> devices = <_DeviceWithAvailability>[];
 
   // Availability
-  StreamSubscription<BluetoothDiscoveryResult> _discoveryStreamSubscription;
-  bool _isDiscovering;
+  StreamSubscription<BluetoothDiscoveryResult>? _discoveryStreamSubscription;
+  late bool _isDiscovering;
 
   _SelectBondedDevicePage();
 
@@ -91,7 +92,7 @@ class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
       });
     });
 
-    _discoveryStreamSubscription.onDone(() {
+    _discoveryStreamSubscription!.onDone(() {
       setState(() {
         _isDiscovering = false;
       });

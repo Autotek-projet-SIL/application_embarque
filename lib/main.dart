@@ -1,9 +1,13 @@
+import 'package:AutotekCar/localisation.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:servo_app/connection.dart';
-import 'package:servo_app/led.dart';
+import 'package:AutotekCar/connection.dart';
+import 'package:AutotekCar/led.dart';
 
-void main() {
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -57,7 +61,7 @@ class Home extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) {
-                return ChatPage(server: device);
+                return geolocalisation();// ChatPage(server: device);
               },
             ),
           );

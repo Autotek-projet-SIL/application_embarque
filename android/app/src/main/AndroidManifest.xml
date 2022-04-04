@@ -1,8 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.servo_app">
+    package="com.example.AutotekCar">
+    <!-- added these permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
    <application
-        android:label="servo_app"
+        android:label="AutotekCar"
         android:icon="@mipmap/ic_launcher">
+
+       <!-- added api key -->
+       <meta-data android:name="com.google.android.geo.API_KEY"
+           android:value="AIzaSyAqKjL3o1J_Hn45ieKwEo9g8XLmj9CqhSc"/>
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
