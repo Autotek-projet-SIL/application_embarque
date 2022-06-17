@@ -10,7 +10,7 @@ class SelectBondedDevicePage extends StatefulWidget {
   final Function onCahtPage;
 
   const SelectBondedDevicePage(
-      {this.checkAvailability = true, @required this.onCahtPage});
+      {this.checkAvailability = true, required this.onCahtPage});
 
   @override
   _SelectBondedDevicePage createState() => new _SelectBondedDevicePage();
@@ -25,17 +25,18 @@ enum _DeviceAvailability {
 class _DeviceWithAvailability extends BluetoothDevice {
   BluetoothDevice device;
   _DeviceAvailability availability;
-  int rssi;
+  int? rssi;
 
-  _DeviceWithAvailability(this.device, this.availability, [this.rssi]);
+  _DeviceWithAvailability(this.device, this.availability, [this.rssi]) :
+        super(name: device.name, address: device.address)  ;
 }
 
 class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
-  List<_DeviceWithAvailability> devices = List<_DeviceWithAvailability>();
+  List<_DeviceWithAvailability> devices = <_DeviceWithAvailability>[];
 
   // Availability
-  StreamSubscription<BluetoothDiscoveryResult> _discoveryStreamSubscription;
-  bool _isDiscovering;
+  StreamSubscription<BluetoothDiscoveryResult>? _discoveryStreamSubscription;
+  late bool _isDiscovering;
 
   _SelectBondedDevicePage();
 
@@ -57,12 +58,12 @@ class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
         devices = bondedDevices
             .map(
               (device) => _DeviceWithAvailability(
-                device,
-                widget.checkAvailability
-                    ? _DeviceAvailability.maybe
-                    : _DeviceAvailability.yes,
-              ),
-            )
+            device,
+            widget.checkAvailability
+                ? _DeviceAvailability.maybe
+                : _DeviceAvailability.yes,
+          ),
+        )
             .toList();
       });
     });
@@ -79,19 +80,19 @@ class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
   void _startDiscovery() {
     _discoveryStreamSubscription =
         FlutterBluetoothSerial.instance.startDiscovery().listen((r) {
-      setState(() {
-        Iterator i = devices.iterator;
-        while (i.moveNext()) {
-          var _device = i.current;
-          if (_device.device == r.device) {
-            _device.availability = _DeviceAvailability.yes;
-            _device.rssi = r.rssi;
-          }
-        }
-      });
-    });
+          setState(() {
+            Iterator i = devices.iterator;
+            while (i.moveNext()) {
+              var _device = i.current;
+              if (_device.device == r.device) {
+                _device.availability = _DeviceAvailability.yes;
+                _device.rssi = r.rssi;
+              }
+            }
+          });
+        });
 
-    _discoveryStreamSubscription.onDone(() {
+    _discoveryStreamSubscription!.onDone(() {
       setState(() {
         _isDiscovering = false;
       });
@@ -111,14 +112,14 @@ class _SelectBondedDevicePage extends State<SelectBondedDevicePage> {
     List<BluetoothDeviceListEntry> list = devices
         .map(
           (_device) => BluetoothDeviceListEntry(
-            device: _device.device,
-            // rssi: _device.rssi,
-            // enabled: _device.availability == _DeviceAvailability.yes,
-            onTap: () {
-              widget.onCahtPage(_device.device);
-            },
-          ),
-        )
+        device: _device.device,
+        // rssi: _device.rssi,
+        // enabled: _device.availability == _DeviceAvailability.yes,
+        onTap: () {
+          widget.onCahtPage(_device.device);
+        },
+      ),
+    )
         .toList();
     return ListView(
       children: list,

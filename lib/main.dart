@@ -1,12 +1,23 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:servo_app/connection.dart';
 import 'package:servo_app/led.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
-  runApp(MyApp());
+List<CameraDescription> cameras = [];
+
+Future<Null> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  try {
+    cameras = await availableCameras();
+  } on CameraException catch (e) {
+    print('Error: $e.code\nError Message: $e.message');
+  }
+  runApp(new MyApp());
 }
-
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
@@ -57,7 +68,7 @@ class Home extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) {
-                return ChatPage(server: device);
+                return ChatPage(cameras: cameras , server: device);
               },
             ),
           );
