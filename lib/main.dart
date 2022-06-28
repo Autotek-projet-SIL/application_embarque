@@ -4,6 +4,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:servo_app/connection.dart';
 import 'package:servo_app/led.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'panne.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -61,19 +62,24 @@ class Home extends StatelessWidget {
         centerTitle: true,
         title: Text('Connection'),
       ),
-      body: SelectBondedDevicePage(
-        onCahtPage: (device1) {
-          BluetoothDevice device = device1;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) {
-                return ChatPage(cameras: cameras , server: device);
-              },
-            ),
-          );
-        },
+      body:
+          SelectBondedDevicePage(
+          onCahtPage: (device1) {
+            BluetoothDevice device = device1;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) {
+
+                  return ChatPage(cameras: cameras , server: device);
+                },
+              ),
+            );
+          },
+        )
+
+
       ),
-    ));
+    );
   }
 }

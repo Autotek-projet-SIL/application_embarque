@@ -80,10 +80,8 @@ class _CameraState extends State<Camera> {
                 isDetecting = false;
               });
             } else {
-              log("flag1");
               Tflite.detectObjectOnFrame(
                 bytesList: img.planes.map((plane) {
-                  log(plane.toString());
                   return plane.bytes;
                 }).toList(),
                 model: widget.model == yolo ? "YOLO" : "SSDMobileNet",

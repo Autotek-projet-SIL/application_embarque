@@ -12,13 +12,22 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:servo_app/home.dart';
 import 'package:tflite/tflite.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 import 'bndbox.dart';
 import 'camera.dart';
 import 'main.dart';
 import 'models.dart';
 import 'package:pausable_timer/pausable_timer.dart';
+import 'package:weather/weather.dart';
+import 'panne.dart';
+
+
+
+final scaffoldKey = GlobalKey<ScaffoldState>();
 
 class ChatPage extends StatefulWidget {
   final BluetoothDevice? server;
@@ -38,17 +47,14 @@ class _Message {
   _Message(this.whom, this.text);
 }
 
+
+
 class _ChatPage extends State<ChatPage> {
 
-  bool isInterrupted = false;
-  int debutInterruption = 0;
-  int finInterruption = 0;
-  String panneauActuel = "";
-  int compteur = 0;
-  String panneauExec = "";
-  bool executerMaintenant = false;
 
+  String scriptOrCam ="";
 
+  var _battery = Battery();
 
 
   List<dynamic> _recognitions = [];
@@ -56,30 +62,24 @@ class _ChatPage extends State<ChatPage> {
   int _imageWidth = 0;
   String _model = "";
 
+  String _numeroDeChassis = "";
 
-
-  Position? _position;
-  Position? _currentPosition;
-  double? _distance;
-
-  List<double> arrayOfLatitude = [0.0,1.0,0.0,0.2165157,0.2165158,1,58.2165157,42.2165557,22.2165857,72.2166157,12.2169157];
-  List<double> arrayOfLongetudes = [0.0,1.0,0.0,0.8286838,0.8286839,1,44.8286838,11.825838,18.1285838,4.2325838,4.8225838];
+  bool estLouee =false;
 
 
 
 
-  double currentBearing = 0;
-  var mySubscription;
-  late CompassEvent tmp ;
 
-  String panneauPrecedent = "";
-  double confience = 1;
+  WeatherFactory wf = new WeatherFactory("c41339e68946f5987cb29b5d10661c19");
 
 
 
-  bool _hasPermissions = false;
-  CompassEvent? _lastRead;
-  DateTime? _lastReadAt;
+
+
+
+  bool ignorerPanneau = false ;
+
+
 
   static final clientID = 0;
   BluetoothConnection? connection;
@@ -88,6 +88,10 @@ class _ChatPage extends State<ChatPage> {
   String _messageBuffer = '';
 
   final TextEditingController textEditingController =
+  new TextEditingController();
+
+
+  final TextEditingController textController =
   new TextEditingController();
   final ScrollController listScrollController = new ScrollController();
 
@@ -99,6 +103,11 @@ class _ChatPage extends State<ChatPage> {
   @override
   initState(){
     super.initState();
+
+    /*
+    demarrerVehicule();
+    arretClient();
+    */
 
 
     BluetoothConnection.toAddress(widget.server!.address).then((_connection) {
@@ -129,21 +138,6 @@ class _ChatPage extends State<ChatPage> {
       print('Cannot connect, exception occured');
       print(error);
     });
-/*
-
-    FirebaseFirestore.instance
-        .collection('CarLocation')
-        .doc('car1')
-        .snapshots(includeMetadataChanges: true)
-        .listen((DocumentSnapshot documentSnapshot) {
-      var newdest = documentSnapshot.data()!["new_dest"];
-      if (newdest) {
-        //get the lat and long and actual position and send them to traductionlistpoint
-
-        //set newdest to false
-
-      }
-    }*/
 
   }
 
@@ -158,36 +152,12 @@ class _ChatPage extends State<ChatPage> {
     super.dispose();
   }
 
-  double _value = 90.0;
+
   @override
   Widget build(BuildContext context) {
     Size screen = MediaQuery.of(context).size;
     onSelect(ssd);
-    /*
 
-    return
-      Scaffold(
-        body
-            : Stack(
-          children: [
-
-            Camera(
-              cameras,
-              _model,
-              setRecognitions,
-
-            ),
-            BndBox(
-                _recognitions == null ? [] : _recognitions,
-                math.max(_imageHeight, _imageWidth),
-                math.min(_imageHeight, _imageWidth),
-                screen.height,
-                screen.width,
-                _model),
-          ],
-        ),
-      );
-*/
     final List<Row> list = messages.map((_message) {
       return Row(
         children: <Widget>[
@@ -213,6 +183,7 @@ class _ChatPage extends State<ChatPage> {
     }).toList();
 
     return Scaffold(
+      key:scaffoldKey,
       appBar: AppBar(
           title: (isConnecting
               ? Text('Connecting chat to ' + widget.server!.name! + '...')
@@ -220,85 +191,195 @@ class _ChatPage extends State<ChatPage> {
               ? Text('Live chat with ' + widget.server!.name!)
               : Text('Chat log with ' + widget.server!.name!))),
       body: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(height: 100,),
-            Row(
-              children: <Widget>[
+        child: (scriptOrCam == "") ? choice() : (scriptOrCam == "script") ? script(list) : automatic(),
+      ),
+    );
+  }
 
-                Flexible(
-                  child: Container(
-                    height: 200,
-                    color: Colors.white,
 
-                    margin: const EdgeInsets.only(left: 16.0),
-                    child: TextField(
+  //Widget du Mode script
+  Widget script(List<Row> list){
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(height: 100,),
+        Row(
+          children: <Widget>[
 
-                      keyboardType: TextInputType.multiline,
-                      maxLines: null,
-                      style: const TextStyle(fontSize: 15.0 , color: Colors.black),
-                      controller: textEditingController,
-                      decoration: InputDecoration.collapsed(
-                        hintText: isConnecting
-                            ? 'Wait until connected...'
-                            : isConnected
-                            ? 'Type your message...'
-                            : 'Chat got disconnected',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                      ),
-                      enabled: true, // is connected
-                    ),
-                  ),
-                ),
-                Container(
-                  margin: const EdgeInsets.all(8.0),
-                  child: IconButton(
-                      icon: const Icon(Icons.send),
-                      onPressed: true // is connected
-                          ? () => _sendMultipleMessages(textEditingController.text)
-                          : null),
-                ),
-              ],
-            ),
             Flexible(
-              child: ListView(
-                  padding: const EdgeInsets.all(12.0),
-                  controller: listScrollController,
-                  children: list),
-            ),/*
-            _buildManualReader(),
-             _buildPositionReader(),*/
-            SizedBox(child:Stack(
-              children: [
+              child: Container(
+                height: 200,
+                color: Colors.white,
 
-                /*Camera(
+                margin: const EdgeInsets.only(left: 16.0),
+                child: TextField(
+
+                  keyboardType: TextInputType.multiline,
+                  maxLines: null,
+                  style: const TextStyle(fontSize: 15.0 , color: Colors.black),
+                  controller: textEditingController,
+                  decoration: InputDecoration.collapsed(
+                    hintText: isConnecting
+                        ? 'Wait until connected...'
+                        : isConnected
+                        ? 'Type your message...'
+                        : 'Chat got disconnected',
+                    hintStyle: const TextStyle(color: Colors.grey),
+                  ),
+                  enabled: true, // is connected
+                ),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.all(8.0),
+              child: IconButton(
+                  icon: const Icon(Icons.send),
+                  onPressed: true // is connected
+                      ? () => _sendMultipleMessages(textEditingController.text)
+                      : null),
+            ),
+          ],
+        ),
+        Flexible(
+          child: ListView(
+              padding: const EdgeInsets.all(12.0),
+              controller: listScrollController,
+              children: list),
+        )
+      ],
+    );
+  }
+
+
+  //Widget pour choisir entre le mode script et le mode automatique
+  Widget choice(){
+    return  Column(
+        children: [
+        Text("Choisissez le type d'execution"),
+    MaterialButton(child: Text("Script"),onPressed: () => setState(() {
+      scriptOrCam = "script";
+    })),
+          MaterialButton(child: Text("auto"),onPressed: () async {
+    _numeroDeChassis = textController.text;
+    if(_numeroDeChassis != ""){
+    var collection = FirebaseFirestore.instance.collection('CarLocation');
+    var docSnapshot = await collection.doc(_numeroDeChassis).get();
+    if (docSnapshot.exists) {
+      int batteryLevel = 50;
+
+
+      _requestPermission();
+      setTemperature();
+
+      final LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 100,
+      );
+
+      StreamSubscription<Position> positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+              (Position? position) async {
+
+                batteryLevel = await _battery.batteryLevel;
+                log("batttery"+ batteryLevel.toString());
+            await collection.doc(_numeroDeChassis).set({
+              "latitude":position!.latitude,
+              "longitude":position!.longitude,
+              "vitesse" : position!.speed,
+              "batterie" : batteryLevel
+            },SetOptions(merge : true));
+            print(position == null ? 'Unknown' : '${position.latitude.toString()}, ${position.longitude.toString()}');
+          });
+
+
+
+
+
+      setState(() {
+        scriptOrCam = "auto";
+      });
+    // Call setState if needed.
+
+
+      demarrerVehicule();
+      arretClient();
+
+    }else{
+    scaffoldKey.currentState!.showSnackBar(const SnackBar(content: Text("Numero de chassis erroné")));
+    }
+    }else{
+    scaffoldKey.currentState!.showSnackBar(const SnackBar(content: Text("Veuillez remplir le numero de chassis")));
+    }
+
+
+
+
+
+    }),
+    Container(
+      height: 30,
+      color: Colors.white,
+
+      margin: const EdgeInsets.only(left: 16.0 , right: 16.0),
+    child:
+    TextField(
+        keyboardType: TextInputType.multiline,
+        maxLines: null,
+        style: const TextStyle(fontSize: 15.0 , color: Colors.black),
+        controller: textController,
+        decoration: InputDecoration.collapsed(
+          filled: true,
+        fillColor: Colors.white,
+        hintText: 'Numero de chassis',
+        hintStyle: const TextStyle(color: Colors.grey),
+        ),
+        enabled: true, // is connected
+        ),
+    )
+
+    ],
+    );
+  }
+
+
+  //Widget du mode automatique
+  Widget automatic(){return
+    SizedBox(child:Stack(
+      children: [
+
+        Camera(
                   cameras,
                   _model,
                   setRecognitions,
 
                 ),
-                BndBox(
+        BndBox(
                     _recognitions == null ? [] : _recognitions,
                     400,
                     400,
                     400,
                     400,
-                    _model),*/
-              ],
-            ),height: 100,width: 100,),
-            MaterialButton(onPressed: () => {
-                if(currentBearing == 0 ){initcurrentBearing()},
-                log('data:'+ _traductionListePoints(arrayOfLatitude,arrayOfLongetudes).toString() ),
+                    _model),
+      Positioned(child:  MaterialButton(
 
-            })
+        child: Text("pannes"),
+        onPressed:() => {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) {
+                int nChassis = int.parse(_numeroDeChassis);
+                print("numero de chassis $nChassis");
+                return Body(nChassis :nChassis );
+              },
+            ),
+          )
+        },
+      ) , bottom: 50),
 
-          ],
-        ),
-      ),
-    );
-  }
+      ],
+    ),height: 500,width: 500,);}
 
+  //Converti les données reçu depuis bluetooth (binaire brut) vers une chaine de charactère
   void _onDataReceived(Uint8List data) {
     // Allocate buffer for parsed data
     int backspacesCounter = 0;
@@ -339,10 +420,6 @@ class _ChatPage extends State<ChatPage> {
           ),
         );
         _messageBuffer = dataString.substring(index);
-        if(_messageBuffer.contains("w")){
-          finInterruption += 10000;
-          print("aaaaaaaaaaaaaa");
-        }
       });
     } else {
       _messageBuffer = (backspacesCounter > 0
@@ -352,6 +429,8 @@ class _ChatPage extends State<ChatPage> {
     }
   }
 
+
+  //Prend en entrée un script et l'envoie sous forme de message compréhensible par la voiture
   _sendMultipleMessages (String text) async{
 
     var speed = 200;
@@ -380,72 +459,24 @@ class _ChatPage extends State<ChatPage> {
       ));
     }else {
 
+      _sendMessage("#");
       for (var i = 0 ; i < arrayOfCommandsCompiled.length ; i++) {
 
         log('data:' + arrayOfCommandsCompiled[i] + ' duration:'+arrayOfDuration[i].toString() + ' arg:'+arrayOfarguments[i].toString());
         _sendMessage(arrayOfCommandsCompiled[i]);
 
 
-        if(arrayOfCommandsCompiled[i] == 'L'  ){await tg(arrayOfarguments[i].toDouble());}
-        else if(arrayOfCommandsCompiled[i] == 'R'){await td(arrayOfarguments[i].toDouble());}
-        else{
-          int startTime = new DateTime.now().millisecondsSinceEpoch;
-          var endTime;
-          do{
 
-            if(executerMaintenant){
-              if(panneauExec == "stop"){
-              _sendMessage("S");
-              debutInterruption = new DateTime.now().millisecondsSinceEpoch;
-              await Future.delayed(Duration(milliseconds: 3000));
-              finInterruption = new DateTime.now().millisecondsSinceEpoch;
-              _sendMessage("F");}
-              if(panneauExec == "dont stop" || panneauExec == "no parking") {
-                debutInterruption = new DateTime.now().millisecondsSinceEpoch;
-                await Future.delayed(Duration(milliseconds: 7000));
-                finInterruption = new DateTime.now().millisecondsSinceEpoch;
-              }
-              if(panneauExec == "speed limit 80" || panneauExec == "speed limit 60" ) {
-                debutInterruption = new DateTime.now().millisecondsSinceEpoch;
-                _sendMessage("A");
-                finInterruption = new DateTime.now().millisecondsSinceEpoch;
-              }
-              if(panneauExec == "speed limit 40") {
-                debutInterruption = new DateTime.now().millisecondsSinceEpoch;
-                _sendMessage("D");
-                finInterruption = new DateTime.now().millisecondsSinceEpoch;
-              }
-
-
-              executerMaintenant = false ;
-              panneauExec = "";
-              compteur = 0 ;
-            }
-            await Future.delayed(Duration(milliseconds: 500));
-
-            endTime =  new DateTime.now().millisecondsSinceEpoch;
-          }while((endTime - startTime) - (finInterruption - debutInterruption)  < arrayOfDuration[i]);
-          log("temp  interrupt ${(finInterruption - debutInterruption)}" );
-          log("Temp instruction ${(endTime - startTime) - (finInterruption - debutInterruption)}");
-
-
-
-
-
-          debutInterruption = 0 ;
-          finInterruption = 0 ;
-          //await Future.delayed(Duration(milliseconds: arrayOfDuration[i]));
-
-        }
-
+            await Future.delayed(Duration(milliseconds: arrayOfDuration[i]));
 
       }
+      _sendMessage("#");
+
     }
 
   }
 
-
-
+  // Converti les unités du script vers ( metres et degrés ) vers en secondes ( ex avancer 2m -> avancer pendant 10 secondes  , tourner 50° -> tourner 5 secondes )
   List<dynamic> _conversionToSeconds(List<dynamic> arrayOfCommands , List<dynamic> arrayOfarguments , int speed){
     var arrayOfDuration = [];
     for(var i = 0 ; i < arrayOfCommands.length ; i++ ){
@@ -470,12 +501,15 @@ class _ChatPage extends State<ChatPage> {
         break;
         default:
           var str = 'Erreur a la ligne ${i+1} , "' +arrayOfCommands.elementAt(i) +'" n''appartient pas au langauage' ;
+          scaffoldKey.currentState!.showSnackBar(SnackBar(content: Text(str)));
+
           return [str];
       }
     }
     return arrayOfDuration;
   }
 
+  // S'assure que tout les mot présent dans le script en entrée apartiennent au languages
   List<dynamic> _analyseLexicale(List<String> arrayOfCommands){
     var res = [];
     for(var i = 0 ; i < arrayOfCommands.length ;i++){
@@ -500,12 +534,15 @@ class _ChatPage extends State<ChatPage> {
         break;
         default:
           var str = 'Erreur a la ligne ${i+1} , "' +arrayOfCommands.elementAt(i) +'" n''appartient pas au langauage' ;
+          log('str');
           return [str];
       }
     }
     return res;
   }
 
+
+  /*
   List<dynamic> _traductionListePoints(List<double> arrayOfLatitudes,List<double> arrayOfLongetudes ){
     var bearing = currentBearing;
 
@@ -525,7 +562,7 @@ class _ChatPage extends State<ChatPage> {
 
     return arrayOfCommands;
   }
-
+*/
   void _sendMessage(String text) async {
     text = text.trim();
     textEditingController.clear();
@@ -552,217 +589,8 @@ class _ChatPage extends State<ChatPage> {
     }
   }
 
-  Widget _buildPermissionSheet() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text('Location Permission Required'),
-          ElevatedButton(
-            child: Text('Request Permissions'),
-            onPressed: () {
-              Permission.locationWhenInUse.request().then((ignored) {
-                _fetchPermissionStatus();
-              });
-            },
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            child: Text('Open App Settings'),
-            onPressed: () {
-              openAppSettings().then((opened) {
-                //
-              });
-            },
-          )
-        ],
-      ),
-    );
-  }
-
-  void _fetchPermissionStatus() {
-    Permission.locationWhenInUse.status.then((status) {
-      if (mounted) {
-        setState(() => _hasPermissions = status == PermissionStatus.granted);
-      }
-    });
-  }
-
-  Widget _buildCompass() {
-    return StreamBuilder<CompassEvent>(
-      stream: FlutterCompass.events,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Text('Error reading heading: ${snapshot.error}');
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-
-        double? direction = snapshot.data!.heading;
-
-        // if direction is null, then device does not support this sensor
-        // show error message
-        if (direction == null)
-          return Center(
-            child: Text("Device does not have sensors !"),
-          );
-
-          return Center(child: Text(direction.toString()),);
-
-
-      },
-    );
-  }
-  Widget _buildManualReader() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: <Widget>[
-          ElevatedButton(
-            child: Text('Read Value'),
-            onPressed: () async {
-              var x = await tg(30);
-              log(x.toString());
-              final CompassEvent tmp = await FlutterCompass.events!.first;
-              setState(() {
-                _lastRead = tmp;
-                _lastReadAt = DateTime.now();
-              });
-            },
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '$_lastRead',
-                    style: Theme.of(context).textTheme.caption,
-                  ),
-                  Text(
-                    '$_lastReadAt',
-                    style: Theme.of(context).textTheme.caption,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  void initcurrentBearing() async{
-    tmp = await FlutterCompass.events!.first;
-    currentBearing = tmp.heading!;
-  }
-  Future  td(double angle) async{
-    tmp = await FlutterCompass.events!.first;
-    log('tmp data:'+ tmp.heading.toString() );
-
-    var a = true;
-
-    double startBearing = tmp.heading!;
-    double endbearing = ((startBearing+angle+180) % 360) - 180 ;
-
-
-    while(a){
-      tmp = await FlutterCompass.events!.first;
-     // log('current bearing'+startBearing.toString() + 'second bearing ' + endbearing.toString());
-
-      log('diff' + ((((tmp.heading! - endbearing + 540) % 360) - 180)).toString());
-      if(((((tmp.heading! - endbearing + 540) % 360) - 180)  > 0)) {a = false ;return true;};
-    };
-
-    tmp = await FlutterCompass.events!.first;
-    currentBearing = tmp.heading!;
-
-
-
- }
-
-  Future  tg(double angle) async{
-    tmp = await FlutterCompass.events!.first;
-    log('tmp data:'+ tmp.heading.toString() );
-
-    var a = true;
-
-    double startBearing = tmp.heading!;
-    double endbearing = ((startBearing-angle+180) % 360) - 180 ;
-
-
-    while(a){
-      tmp = await FlutterCompass.events!.first;
-      //log('current bearing'+startBearing.toString() + 'second bearing ' + endbearing.toString());
-
-      log('diff' + ((((tmp.heading! - endbearing + 540) % 360) - 180)).toString());
-      if(((((tmp.heading! - endbearing + 540) % 360) - 180)  < 0)) {a = false ;return true;};
-    };
-
-    tmp = await FlutterCompass.events!.first;
-    currentBearing = tmp.heading!;
-
-  }
-
- _buildPositionReader()  {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: <Widget>[
-          ElevatedButton(
-            child: Text('Set point'),
-            onPressed: () async {
-              final tmpPos  =  await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-              setState(() {
-                _position = tmpPos;
-              });
-            },
-          ),
-          ElevatedButton(
-            child: Text('Get distance'),
-            onPressed: () async {
-              final tmpCurr = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-              setState(() {
-                _currentPosition = tmpCurr;
-                _distance = Geolocator.distanceBetween(_position!.latitude, _position!.longitude, _currentPosition!.latitude, _currentPosition!.longitude);
-              });
-            },
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'ancre: '+_position.toString(),
-                    style: Theme.of(context).textTheme.caption,
-                  ),
-                  Text(
-                    'position ' + _currentPosition.toString(),
-                    style: Theme.of(context).textTheme.caption,
-                  ),
-                  Text(
-                    'distance ' + _distance.toString(),
-                    style: Theme.of(context).textTheme.caption,
-                  )
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
+  // Cette fonction charge le model depuis le stockage
+  // Vers un objet model en memoire centrale
   loadModel() async {
     String res;
     switch (_model) {
@@ -792,12 +620,32 @@ class _ChatPage extends State<ChatPage> {
     print(res);
   }
 
+
+  // Cette fonction est appelé pour selectionr quel model utiliser
   onSelect(model) {
     setState(() {
       _model = model;
     });
     loadModel();
   }
+
+
+  //Cette fonction est appelé quelques secondes aprés la detection d'un panneau
+  //Pour signaler qu'on a depassé le panneau detecté
+  // Et que nous devons continuer a traiter les nouvelle detection
+  void handleTimeout(String panneau) {  // callback function
+    ignorerPanneau = false;
+    log("timed out $panneau");
+  }
+
+
+
+
+
+  // Cette fonction est appelé a chaque foie que le model de machine learning
+  // Finit de traiter une image de la camera
+  //Elle execute la les instruction associé a la detection de chaque panneau
+  //Elle affiche les carré bleu sur l'ecran de la camera là ou le panneau est detecté
 
   setRecognitions(recognitions, imageHeight, imageWidth) {
     setState(() {
@@ -806,69 +654,193 @@ class _ChatPage extends State<ChatPage> {
       _imageWidth = imageWidth;
     });
     if(_recognitions.length > 0) {
-      if("crosswalk" == _recognitions[0]["detectedClass"].toString()){
-      _sendMessage("D");
-      log("Decelerer");
-      }
-      if(_recognitions[0]["detectedClass"].toString().contains("speed")){
-        _sendMessage("A");
-        log("Accelerer");
 
-      }
-      if("stop" == _recognitions[0]["detectedClass"].toString()){
-        _sendMessage("S");
-        log("Stop");
-      }
+      if(!ignorerPanneau){
+        log("panneau detecte");
 
-      log('_recognitions.length > 0');
-     log("Egalité des panneaux " + panneauActuel+" == " + _recognitions[0]["detectedClass"].toString() + (panneauActuel == _recognitions[0]["detectedClass"].toString()).toString());
-      if(panneauActuel == _recognitions[0]["detectedClass"].toString())
-      {compteur++;
-      log('panneau qui se repete ,compteur $compteur');
+        // Quand on detecte un panneau dans une frame
+        // On ignore la detection des panneau pendant quelques secondes
+        // Parce qu'il s'agit du même panneau detecté plusieurs foies
+        ignorerPanneau = true;
+        Future.delayed(const Duration(milliseconds: 4000), () {
+
+        handleTimeout(_recognitions[0]["detectedClass"].toString());
+
+        });
+
+
+        if(_recognitions.toString().contains("crosswalk")){
+        arretPanneau();
+        log("crosswalk");
         }
-      else{
-        panneauActuel = _recognitions[0]["detectedClass"].toString();
-        compteur = 0;
-        log("panneauActuel mis a jour: $panneauActuel");
-      }
+        if(_recognitions[0]["detectedClass"].toString().contains("speed")){
+          _sendMessage("D");
+          log("Decelerer");
+        }
+        if(_recognitions[0]["detectedClass"].toString().contains("main road")){
+          _sendMessage("A");
+          log("Accelerer");
+        }
+        if(_recognitions.toString().contains("stop")){
+          _sendMessage("S");
+          log("Stop");
 
-      if(compteur == 5 && panneauActuel != ""){
-        panneauExec = panneauActuel;
-        log("executer le panneau $panneauExec");
-      }
-
-      log((_recognitions[0]["detectedClass"]).toString());
-    }else{
-      if(panneauActuel == "")
-        {
-          log("on est plus sur qu'il n'y a plus de panneau compteur : $compteur");
-          compteur++;
-          if(compteur == 5 && panneauExec != "")
-          {
-            log('le panneau n\'est plus visible on l\'execute maintenant ');
-            executerMaintenant = true;
-
-            compteur = 0 ;
-
-          }
+          Future.delayed(const Duration(milliseconds: 2000), () {
+            _sendMessage("F");
+            log("Continuer apres s'etre arreté 2 seconed au panneau");
+          });
 
         }
-      else
-      {
-        log("pas de panneau compteur remis a zero");
-        panneauActuel = "";
-        compteur = 0;
+
       }
+
+
+
+      log('_recognitions.length > 0' + _recognitions.toString());
 
 
     };
   }
 
 
+  //Cette fonction demande la permission pour utiliser la geolocaliation
+  _requestPermission() async {
+    var status = await Permission.location.request();
+    if (status.isGranted) {
+      print('done');
+    } else if (status.isDenied) {
+      _requestPermission();
+    } else if (status.isPermanentlyDenied) {
+      openAppSettings();
+    }
+  }
 
 
+  // Cette fonction initialise les valeur sur firebase relative au vehicule.
+  void demarrerVehicule() async {
+    print("demarrer vehicule est execute");
+    var db = FirebaseFirestore.instance;
+    final docRef =
+    db.collection('CarLocation').doc(_numeroDeChassis);
+    docRef.snapshots().listen(
+          (event) {
+        print("current data Demarrer: ${event.data()}");
+        // si  deverrouiller est vrai
+        if (event["loue"] && !event["arrive"]) {
+          print("doc snapshot demarrer vehicule");
+          estLouee = true;
+          //Demarrer le vehicule : LOcataire a fait une demande
+          _sendMessage("F");
+
+        }
+      },
+      onError: (error) => print("Listen failed: $error"),
+    );
+  }
+
+
+  //Cette fonction est executé quand un panneau "cross walk" est detecté ,
+  // Elle arrête la voiture pour recupérer un client
+  //On assume que le client est entrain d'attendre la voiture au niveau de ce panneau
+  void arretPanneau() async {
+    print("arretp1 "+estLouee.toString());
+    if (true) {
+
+
+      print("arret panneau est execute");
+      var db = FirebaseFirestore.instance;
+      final docRef =
+      db.collection('CarLocation').doc(_numeroDeChassis);
+
+      _sendMessage("S");
+
+      print("stop envoye arrive mit a true");
+      await docRef.set({
+        "arrive": true
+      }, SetOptions(merge: true));
+
+
+      docRef.snapshots().listen(
+            (event) async {
+
+          print("current data arretPanneau: ${event.data()}");
+          // si  deverrouiller est vrai
+          if (["nom_locataire"] != "") {
+            print("arret panneau flagooo");
+
+            //Demarrer le vehicule : LOcataire a fait une demande
+            var nom_locataire = event["nom_locataire"];
+
+            _sendMessage("@${nom_locataire}@@@");
+
+
+            print("arrive est mit a false      loue:" + event["loue"].toString() + "      locataire : " + event["nom_locataire"].toString());
+            await docRef.set({
+              "arrive": false
+            }, SetOptions(merge: true));
+
+
+            _sendMessage("F");
+          }
+        },
+        onError: (error) => print("Listen failed: $error"),
+      );
+    }
+  }
+
+
+  // est appelé quand le client veut descendre du vehicule
+  // Il fait un appel depuis son application sur son telephone
+  void arretClient() async{
+    print("arret client est executé");
+    var db = FirebaseFirestore.instance;
+    final docRef =
+    db.collection('CarLocation').doc(_numeroDeChassis);
+    docRef.snapshots().listen(
+          (event) {
+            print("doc snapshot arret client");
+
+            print("current data arretClient: ${event.data()}");
+        // si  deverrouiller est vrai
+        if (!event["loue"] && event["arrive"]) {
+
+          print("arret client flagoooo");
+
+          estLouee = false;
+          //Demarrer le vehicule : LOcataire a fait une demande
+          _sendMessage("S");
+
+        }
+      },
+      onError: (error) => print("Listen failed: $error"),
+    );
+
+
+  }
+
+
+
+  // Cette fonction fait une requete vers l'api WEATHERAPI , pour recupere la temperature au coordonée de la voiture
+  //Puis insère cette valeur dans la base de donnée
+  void setTemperature() async {
+    var collection = FirebaseFirestore.instance.collection('CarLocation');
+    var docSnapshot = await collection.doc(_numeroDeChassis).get();
+    final LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 100,
+    );
+    var position =await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+    Weather w = await wf.currentWeatherByLocation(position.latitude, position.longitude);
+    var temperature = w.temperature!.celsius!;
+
+    await collection.doc(_numeroDeChassis).set({
+      "temperature":temperature
+    },SetOptions(merge : true));
+
+  }
 
 
 
 
 }
+
